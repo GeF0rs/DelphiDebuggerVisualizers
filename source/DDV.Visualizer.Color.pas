@@ -1,31 +1,23 @@
-unit DDV.Visualizer.Color;
-
-// Delphi Code Visualizers
-// Copyright (c) 2020 Tobias Rörig
-// https://github.com/janidan/DelphiDebuggerVisualizers
-
-{* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. *}
-
+ï»¿unit DDV.Visualizer.Color;
+
 interface
 
 uses
   DDV.Visualizers.Common;
 
 const
-  ColorVisualizerTypes: array [0 .. 1] of TCommonDebuggerVisualizerType = ( //
-    ( TypeName: 'TColor' ), ( TypeName: 'Graphics::TColor' ) );
+  ColorVisualizerTypes: array [0 .. 1] of TCommonDebuggerVisualizerType = (
+    (TypeName: 'TColor'), (TypeName: 'Graphics::TColor'));
 
 resourcestring
   ColorVisualizerName = 'TColor visualizer';
   ColorVisualizerDescription = 'Visualizes a TColor to a human readable format';
 
 type
-  TColorVisualizer = class( TCommonDebuggerVisualizer )
+  TColorVisualizer = class(TCommonDebuggerVisualizerValueReplacer)
   protected
     function GetSupportedTypesList: TArray<TCommonDebuggerVisualizerType>; override;
-    function GetReplacementValue( const Expression, TypeName, EvalResult: string ): string; override;
+    function GetReplacementValue(const Expression, TypeName, EvalResult: string): string; override;
 
     function GetVisualizerName: string; override;
     function GetVisualizerDescription: string; override;
@@ -35,18 +27,31 @@ implementation
 
 uses
   System.SysUtils,
-  Vcl.Graphics;
+  Vcl.Graphics,
+  Windows;
 
 { TColorVisualizer }
 
-function TColorVisualizer.GetReplacementValue( const Expression, TypeName, EvalResult: string ): string;
+function ColorToHex(Color: integer) : string;
 begin
-  Result := ColorToString( StrToInt( EvalResult ) );
+  Result := '#' +
+    IntToHex(GetRValue(ColorToRGB(Color)), 2) +
+    IntToHex(GetGValue(ColorToRGB(Color)), 2) +
+    IntToHex(GetBValue(ColorToRGB(Color)), 2);
+end;
+
+function TColorVisualizer.GetReplacementValue(const Expression, TypeName, EvalResult: string): string;
+var
+  hexHtmlColor, strColor: string;
+begin
+  hexhtmlColor := ColorToHex(StrToInt(EvalResult));
+  strColor := ColorToString(StrToInt(EvalResult));
+  Result := Format('%s' + sLineBreak + '%s' + sLineBreak + '%s', [hexhtmlColor, strColor, EvalResult]);
 end;
 
 function TColorVisualizer.GetSupportedTypesList: TArray<TCommonDebuggerVisualizerType>;
 begin
-  Result := ConvertStaticToDynamicArray( ColorVisualizerTypes );
+  Result := ConvertStaticToDynamicArray(ColorVisualizerTypes);
 end;
 
 function TColorVisualizer.GetVisualizerDescription: String;

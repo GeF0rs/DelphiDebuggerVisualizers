@@ -1,19 +1,15 @@
 unit DDV.Visualizers.Common;
 
-// Delphi Code Visualizers
-// Copyright (c) 2020 Tobias Rцrig
-// https://github.com/janidan/DelphiDebuggerVisualizers
-
-{* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. *}
+//на основе https://github.com/janidan/DelphiDebuggerVisualizers
 
 interface
 
 uses
   ToolsAPI,
   DDV.Visualizers.CommonOTA,
-  DDV.Visualizers.Evaluator;
+  DDV.Visualizers.Evaluator,
+  DDV.Visualizers.CommonForm,
+  DDV.Visualizers.CommonFrame;
 
 type
   TCommonDebuggerVisualizerType = record
@@ -22,11 +18,13 @@ type
     IsGeneric: Boolean;
   end;
 
-  TCommonDebuggerVisualizer = class( TInterfacedObject, IOTADebuggerVisualizer, IOTADebuggerVisualizer250, IOTADebuggerVisualizerValueReplacer )
+  TCommonDebuggerVisualizer = class(TInterfacedObject, IOTADebuggerVisualizer
+  //, IOTADebuggerVisualizer250
+  )
   protected
-    function ConvertStaticToDynamicArray<T>( const aStatic: array of T ): TArray<T>;
+    function ConvertStaticToDynamicArray<T>(const aStatic: array of T): TArray<T>;
     function GetSupportedTypesList: TArray<TCommonDebuggerVisualizerType>; virtual; abstract;
-  protected // Interface implementations
+  protected
     {$REGION 'IOTADebuggerVisualizer interface implementation'}
     { This is the base for debugger visualizers.  This interface allows you to
       specify a name, a unique identifier, and a description for your visualizer.
@@ -37,7 +35,7 @@ type
     { Return the Index'd Type.  TypeName is the type.  AllDescendants indicates
       whether or not types descending from this type should use this visualizer
      as well. }
-    procedure GetSupportedType( Index: Integer; var TypeName: string; var AllDescendants: Boolean ); overload; virtual;
+    procedure GetSupportedType(Index: Integer; var TypeName: string; var AllDescendants: Boolean); overload; virtual;
     { Return a unique identifier for this visualizer.  This identifier is used
       as the keyname when storing data for this visualizer in the registry.  It
      should not be translated }
@@ -47,12 +45,16 @@ type
     { Return a description of the visualizer to be shown in the Tools | Options dialog }
     function GetVisualizerDescription: string; virtual;
     {$ENDREGION 'IOTADebuggerVisualizer interface implementation'}
-    {$REGION 'IOTADebuggerVisualizer250 interface implementation'}
-    { Return the Index'd Type.  TypeName is the type.  AllDescendants indicates
-      whether or not types descending from this type should use this visualizer
-     as well. IsGeneric indicates whether this type is a generic type. }
-    procedure GetSupportedType( Index: Integer; var TypeName: string; var AllDescendants: Boolean; var IsGeneric: Boolean ); overload; virtual;
-    {$ENDREGION 'IOTADebuggerVisualizer250 interface implementation'}
+//    {$REGION 'IOTADebuggerVisualizer250 interface implementation'}
+//    { Return the Index'd Type.  TypeName is the type.  AllDescendants indicates
+//      whether or not types descending from this type should use this visualizer
+//     as well. IsGeneric indicates whether this type is a generic type. }
+//    procedure GetSupportedType(Index: Integer; var TypeName: string; var AllDescendants: Boolean; var IsGeneric: Boolean); overload; virtual;
+//    {$ENDREGION 'IOTADebuggerVisualizer250 interface implementation'}
+  end;
+
+  TCommonDebuggerVisualizerValueReplacer = class(TCommonDebuggerVisualizer, IOTADebuggerVisualizerValueReplacer)
+  protected
     {$REGION 'IOTADebuggerVisualizerValueReplacer interface implementation'}
     { This is the simplest form of a debug visualizer.  With it, you can replace
       the value returned by the evaluator with a more meaningful value.  The
@@ -60,17 +62,38 @@ type
      Tooltips, Watch View, Locals View, Evaluate/Modify dialog,
      Debug Inspector View).
      There can be only one active IOTADebuggerVisualizerValueReplacer per type }
-    function GetReplacementValue( const Expression, TypeName, EvalResult: string ): string; virtual;
+    function GetReplacementValue(const Expression, TypeName, EvalResult: string): string; virtual;
     {$ENDREGION 'IOTADebuggerVisualizerValueReplacer interface implementation'}
   end;
 
-  TCommonDebuggerEvaluationVisualizer = class( TCommonDebuggerVisualizer )
+  TCommonDebuggerVisualizerExternalViewer = class(TCommonDebuggerVisualizer, IOTADebuggerVisualizerExternalViewer, IExternalVisualizerEvaluator)
+  protected
+    FExpression: string;
+  protected
+    {$REGION 'IOTADebuggerVisualizerExternalViewer interface implementation'}
+    function GetMenuText: string; virtual; abstract;
+    function Show(const Expression, TypeName, EvalResult: string;
+      SuggestedLeft, SuggestedTop: Integer): IOTADebuggerVisualizerExternalViewerUpdater; virtual;
+    {$ENDREGION 'IOTADebuggerVisualizerExternalViewer interface implementation'}
+    function GetFormClass(): TCommonVisualizerFormClass; virtual;
+    function GetExternalEvaluator(): IExternalVisualizerEvaluator; virtual;
+    procedure Evaluate(const Expression, TypeName, EvalResult: string); virtual;
+  end;
+
+  TCommonDebuggerEvaluationVisualizer = class(TCommonDebuggerVisualizerValueReplacer)
   private
     FDebuggerEvaluator: IDDVDebuggerEvaluator;
   protected
     function GetEvaluator: IDDVDebuggerEvaluator;
-    function GetEvaluationCall( const Expression, TypeName, EvalResult: string ): string; virtual; abstract;
-    function GetReplacementValue( const Expression, TypeName, EvalResult: string ): string; override;
+    function GetEvaluationCall(const Expression, TypeName, EvalResult: string): string; virtual; abstract;
+    function GetReplacementValue(const Expression, TypeName, EvalResult: string): string; override;
+  end;
+
+  TCommonDebuggerEvaluationVisualizerExt = class(TCommonDebuggerVisualizerExternalViewer)
+  private
+    FDebuggerEvaluator: IDDVDebuggerEvaluator;
+  protected
+    function GetEvaluator: IDDVDebuggerEvaluator;
   end;
 
 implementation
@@ -80,31 +103,32 @@ uses
 
 { TCommonDebuggerVisualizer }
 
-function TCommonDebuggerVisualizer.ConvertStaticToDynamicArray<T>( const aStatic: array of T ): TArray<T>;
+function TCommonDebuggerVisualizer.ConvertStaticToDynamicArray<T>(const aStatic: array of T): TArray<T>;
 var
   i: Integer;
 begin
-  SetLength( Result, Length( aStatic ) );
-  for i := 0 to high( aStatic ) do
+  SetLength(Result, Length(aStatic));
+  for i := 0 to high(aStatic) do
     Result[i] := aStatic[i];
 end;
 
-function TCommonDebuggerVisualizer.GetReplacementValue( const Expression, TypeName, EvalResult: string ): string;
+function TCommonDebuggerVisualizerValueReplacer.GetReplacementValue(const Expression, TypeName, EvalResult: string): string;
 begin
-  Result := Format( '%s : %s = %s', [Expression, TypeName, EvalResult] );
+  Result := Format('%s : %s = %s', [Expression, TypeName, EvalResult]);
 end;
 
-procedure TCommonDebuggerVisualizer.GetSupportedType( Index: Integer; var TypeName: string; var AllDescendants, IsGeneric: Boolean );
-var
-  vTypeInfo: TCommonDebuggerVisualizerType;
-begin
-  vTypeInfo := GetSupportedTypesList[Index];
-  TypeName := vTypeInfo.TypeName;
-  AllDescendants := vTypeInfo.AllDescendants;
-  IsGeneric := vTypeInfo.IsGeneric;
-end;
+//вернуть когда перейдём минимум на Tokyo 10.2
+//procedure TCommonDebuggerVisualizer.GetSupportedType(Index: Integer; var TypeName: string; var AllDescendants, IsGeneric: Boolean);
+//var
+//  vTypeInfo: TCommonDebuggerVisualizerType;
+//begin
+//  vTypeInfo := GetSupportedTypesList[Index];
+//  TypeName := vTypeInfo.TypeName;
+//  AllDescendants := vTypeInfo.AllDescendants;
+//  IsGeneric := vTypeInfo.IsGeneric;
+//end;
 
-procedure TCommonDebuggerVisualizer.GetSupportedType( Index: Integer; var TypeName: string; var AllDescendants: Boolean );
+procedure TCommonDebuggerVisualizer.GetSupportedType(Index: Integer; var TypeName: string; var AllDescendants: Boolean);
 var
   vTypeInfo: TCommonDebuggerVisualizerType;
 begin
@@ -115,7 +139,7 @@ end;
 
 function TCommonDebuggerVisualizer.GetSupportedTypeCount: Integer;
 begin
-  Result := Length( GetSupportedTypesList );
+  Result := Length(GetSupportedTypesList);
 end;
 
 function TCommonDebuggerVisualizer.GetVisualizerDescription: string;
@@ -137,22 +161,63 @@ end;
 
 function TCommonDebuggerEvaluationVisualizer.GetEvaluator: IDDVDebuggerEvaluator;
 begin
-  if not Assigned( FDebuggerEvaluator ) then
+  if not Assigned(FDebuggerEvaluator) then
     FDebuggerEvaluator := TDebuggerEvaluator.Create;
   Result := FDebuggerEvaluator;
 end;
 
-function TCommonDebuggerEvaluationVisualizer.GetReplacementValue( const Expression, TypeName, EvalResult: string ): string;
+function TCommonDebuggerEvaluationVisualizer.GetReplacementValue(const Expression, TypeName, EvalResult: string): string;
+var
+  ExprStr: string;
 begin
-  // if the evaluation has already resulted in "nil" there is no point in executing an additonal evaluation call.
-  // Even worse - the error of an invalid call to the evaluator only clutters the result.
-  if ( EvalResult = 'nil' ) then
-    Exit( 'nil' );
+  if (EvalResult = 'nil') then
+    Exit('nil');
+  ExprStr := GetEvaluationCall(Expression, TypeName, EvalResult);
 
-  // If the evaluation is not successfull we will preappend the origninal evaluation result to the error message, so that the user
-  // has the "best" result in the debugger.
-  if not GetEvaluator.TryExecuteEvaluation( GetEvaluationCall( Expression, TypeName, EvalResult ), Result ) then
-    Result := Format( '%s (Eval: %s)', [EvalResult, Result] );
+  if not GetEvaluator.TryExecuteEvaluation(ExprStr, Result) then
+    Result := Format('%s', [Result]);
+end;
+
+{ TCommonDebuggerEvaluationVisualizerExt }
+
+function TCommonDebuggerEvaluationVisualizerExt.GetEvaluator: IDDVDebuggerEvaluator;
+begin
+  if not Assigned(FDebuggerEvaluator) then
+    FDebuggerEvaluator := TDebuggerEvaluator.Create;
+  Result := FDebuggerEvaluator;
+end;
+
+{ TCommonDebuggerVisualizerExternalViewer }
+
+procedure TCommonDebuggerVisualizerExternalViewer.Evaluate(const Expression, TypeName, EvalResult: string);
+begin
+
+end;
+
+function TCommonDebuggerVisualizerExternalViewer.GetExternalEvaluator: IExternalVisualizerEvaluator;
+begin
+  Result := self;
+end;
+
+function TCommonDebuggerVisualizerExternalViewer.GetFormClass: TCommonVisualizerFormClass;
+begin
+  Result := TCommonVisualizerForm;
+end;
+
+function TCommonDebuggerVisualizerExternalViewer.Show(const Expression, TypeName, EvalResult: string; SuggestedLeft,
+  SuggestedTop: Integer): IOTADebuggerVisualizerExternalViewerUpdater;
+var
+  VisDockForm: TCommonVisualizerForm;
+  FCommonFrame: TCommonVisualizerFrame;
+begin
+  VisDockForm := GetFormClass().Create(Expression, SuggestedLeft, SuggestedTop);
+  FCommonFrame := VisDockForm.GetFrame();
+  FCommonFrame.SetEvaluator(GetExternalEvaluator());
+  Result := FCommonFrame;
+
+  FExpression := Expression;
+  Evaluate(Expression, TypeName, EvalResult);
+  FCommonFrame.Show;
 end;
 
 end.
