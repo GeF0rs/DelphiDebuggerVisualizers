@@ -74,10 +74,10 @@ end;
 
 function TCommonVisualizerForm.EditAction(Action: TEditAction): Boolean;
 begin
+  Result := False;
   if (Action = eaSelectAll) then
   begin
     Result := True;
-    ShowMessage('eaSelectAll');
   end;
 end;
 

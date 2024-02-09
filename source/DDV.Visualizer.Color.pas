@@ -11,7 +11,7 @@ const
 
 resourcestring
   ColorVisualizerName = 'TColor visualizer';
-  ColorVisualizerDescription = 'Visualizes a TColor to a human readable format';
+  ColorVisualizerDescription = 'Visualizes a TColor to a HTML and Pascal format';
 
 type
   TColorVisualizer = class(TCommonDebuggerVisualizerValueReplacer)
@@ -43,9 +43,14 @@ end;
 function TColorVisualizer.GetReplacementValue(const Expression, TypeName, EvalResult: string): string;
 var
   hexHtmlColor, strColor: string;
+  Color: integer;
 begin
-  hexhtmlColor := ColorToHex(StrToInt(EvalResult));
-  strColor := ColorToString(StrToInt(EvalResult));
+  Result := EvalResult;
+  if not TryStrToInt(EvalResult, Color) then exit;
+
+  hexhtmlColor := ColorToHex(Color);
+  strColor := ColorToString(Color);
+
   Result := Format('%s' + sLineBreak + '%s' + sLineBreak + '%s', [hexhtmlColor, strColor, EvalResult]);
 end;
 
